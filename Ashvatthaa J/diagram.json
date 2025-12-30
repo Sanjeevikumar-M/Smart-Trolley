@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "author": "Ashvatthaa J",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "wokwi-rgb-led",
+      "id": "rgb1",
+      "top": 52,
+      "left": -114.1,
+      "attrs": { "common": "cathode" }
+    },
+    {
+      "type": "wokwi-rgb-led",
+      "id": "rgb2",
+      "top": 32.8,
+      "left": 183.5,
+      "attrs": { "common": "cathode" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:GND.1", "rgb1:COM", "black", [ "h0" ] ],
+    [ "rgb1:R", "esp:25", "green", [ "v0" ] ],
+    [ "rgb1:G", "esp:26", "green", [ "v0" ] ],
+    [ "rgb1:B", "esp:27", "green", [ "v0" ] ],
+    [ "rgb2:R", "esp:32", "green", [ "v-86.4", "h-220.8", "v96" ] ],
+    [ "esp:33", "rgb2:G", "green", [ "h-14.21", "v-76.8", "h172.8" ] ],
+    [ "esp:14", "rgb2:B", "green", [ "h-23.81", "v-134.4", "h249.6" ] ],
+    [ "esp:GND.1", "rgb2:COM", "black", [ "h-43.01", "v67.2", "h230.4" ] ]
+  ],
+  "dependencies": {}
+}
