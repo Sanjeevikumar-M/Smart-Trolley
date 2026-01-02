@@ -8,13 +8,16 @@ from .models import CartItem
 from .serializers import (
     CartScanSerializer,
     CartRemoveSerializer,
-    CartItemSerializer
+    CartItemSerializer,
+    ESP32ScanSerializer
 )
 from products.models import Product
+from sessions.models import Session
 from sessions.views import validate_session
+from trolleys.models import Trolley
 
 
-class CartScanView(APIView):
+class CartScanView(APIView):  
     """
     POST /api/cart/scan
     Scan a product barcode to add it to the cart.
@@ -176,4 +179,109 @@ class CartViewView(APIView):
             'total_items': total_items,
             'total_amount': str(total_amount)
         })
+
+
+class ESP32ScanView(APIView):
+    """
+    POST /api/cart/esp32-scan
+    Handle product scan from ESP32 device in the trolley.
+    ESP32 sends trolley_id and product_id (barcode).
+    Backend resolves the active session and adds product to cart.
+    """
+    
+    def post(self, request):
+        serializer = ESP32ScanSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        trolley_id = serializer.validated_data['trolley_id']
+        product_id = serializer.validated_data['product_id']
+        
+        # Find trolley
+        try:
+            trolley = Trolley.objects.get(trolley_id=trolley_id)
+        except Trolley.DoesNotExist:
+            return Response(
+                {'error': f'Trolley {trolley_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Find active session for this trolley
+        try:
+            session = Session.objects.get(trolley=trolley, is_active=True)
+        except Session.DoesNotExist:
+            return Response(
+                {
+                    'error': f'No active session found for trolley {trolley_id}',
+                    'message': 'Please scan the trolley QR code first to start a session'
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if session is expired
+        if session.is_expired():
+            session.end_session()
+            CartItem.objects.filter(session=session).delete()
+            return Response(
+                {
+                    'error': 'Session has expired',
+                    'message': 'Please scan the trolley QR code again to start a new session'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Find product by product_id (barcode)
+        try:
+            product = Product.objects.get(barcode=product_id, is_active=True)
+        except Product.DoesNotExist:
+            return Response(
+                {'error': f'Product with ID {product_id} not found or inactive'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Update session heartbeat
+        session.update_heartbeat()
+        
+        # Add or update product in cart
+        cart_item, created = CartItem.objects.get_or_create(
+            session=session,
+            product=product,
+            defaults={'quantity': 1}
+        )
+        
+        if not created:
+            # Item already exists, increment quantity
+            cart_item.quantity += 1
+            cart_item.save()
+        
+        # Get cart summary
+        total_items = CartItem.objects.filter(session=session).aggregate(
+            total=Sum('quantity')
+        )['total'] or 0
+        
+        total_amount = CartItem.objects.filter(session=session).aggregate(
+            total=Sum('subtotal')
+        )['total'] or Decimal('0.00')
+        
+        return Response({
+            'session_id': str(session.session_id),
+            'trolley_id': trolley_id,
+            'product': {
+                'product_id': product.barcode,
+                'name': product.name,
+                'price': str(product.price),
+                'category': product.category,
+                'image_url': product.image_url if hasattr(product, 'image_url') else None
+            },
+            'cart_item': {
+                'quantity': cart_item.quantity,
+                'subtotal': str(cart_item.subtotal)
+            },
+            'cart_summary': {
+                'total_items': total_items,
+                'total_amount': str(total_amount)
+            },
+            'action': 'added' if created else 'quantity_updated',
+            'message': f'{product.name} {"added to" if created else "updated in"} cart'
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 

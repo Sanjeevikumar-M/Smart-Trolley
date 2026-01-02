@@ -28,3 +28,13 @@ class SessionResponseSerializer(serializers.Serializer):
     session_id = serializers.UUIDField()
     trolley_id = serializers.CharField()
     message = serializers.CharField()
+
+
+class QRScanResponseSerializer(serializers.Serializer):
+    """Serializer for QR code scan response to frontend."""
+    session_id = serializers.UUIDField()
+    trolley_id = serializers.CharField()
+    trolley_locked = serializers.BooleanField()
+    is_new_session = serializers.BooleanField()
+    message = serializers.CharField()
+    cart_items_count = serializers.IntegerField()

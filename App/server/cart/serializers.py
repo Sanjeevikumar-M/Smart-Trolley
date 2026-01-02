@@ -14,9 +14,15 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 
 class CartScanSerializer(serializers.Serializer):
-    """Serializer for cart scan input."""
+    """Serializer for cart scan input (from web frontend)."""
     session_id = serializers.UUIDField()
     barcode = serializers.CharField(max_length=50)
+
+
+class ESP32ScanSerializer(serializers.Serializer):
+    """Serializer for ESP32 device scanning products in trolley."""
+    trolley_id = serializers.CharField(max_length=50, help_text="Trolley ID from ESP32 device")
+    product_id = serializers.CharField(max_length=50, help_text="Product ID/barcode scanned by ESP32")
 
 
 class CartRemoveSerializer(serializers.Serializer):

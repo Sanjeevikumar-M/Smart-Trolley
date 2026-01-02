@@ -7,9 +7,11 @@ from .models import Session
 from .serializers import (
     SessionStartSerializer,
     SessionIdSerializer,
-    SessionResponseSerializer
+    SessionResponseSerializer,
+    QRScanResponseSerializer
 )
 from trolleys.models import Trolley
+from trolleys.serializers import TrolleyQRSerializer
 from cart.models import CartItem
 
 
@@ -184,4 +186,85 @@ class SessionEndView(APIView):
             'items_cleared': cart_items_count,
             'message': 'Session ended successfully'
         })
+
+
+class SessionQRScanView(APIView):
+    """
+    POST /api/session/qr-scan
+    Handle QR code scan from user device.
+    Creates a new session or returns existing active session for the trolley.
+    This is the entry point when user scans trolley QR code.
+    """
+    
+    def post(self, request):
+        serializer = TrolleyQRSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        trolley_id = serializer.validated_data['trolley_id']
+        
+        # Check if trolley exists
+        try:
+            trolley = Trolley.objects.get(trolley_id=trolley_id)
+        except Trolley.DoesNotExist:
+            return Response(
+                {'error': f'Trolley {trolley_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check if trolley is active
+        if not trolley.is_active:
+            return Response(
+                {'error': f'Trolley {trolley_id} is not available for use'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check for existing active session
+        existing_session = Session.objects.filter(
+            trolley=trolley, 
+            is_active=True
+        ).first()
+        
+        is_new_session = False
+        
+        if existing_session:
+            # Check if expired
+            if existing_session.is_expired():
+                # Clear old cart and end session
+                CartItem.objects.filter(session=existing_session).delete()
+                existing_session.end_session()
+                # Create new session
+                session = Session.objects.create(trolley=trolley)
+                is_new_session = True
+            else:
+                # Return existing active session
+                session = existing_session
+                # Update heartbeat
+                session.update_heartbeat()
+        else:
+            # Create new session
+            session = Session.objects.create(trolley=trolley)
+            is_new_session = True
+        
+        # Unlock the trolley
+        if trolley.is_locked:
+            trolley.is_locked = False
+            trolley.save(update_fields=['is_locked', 'last_seen'])
+        
+        # Get cart items count
+        cart_items_count = CartItem.objects.filter(session=session).count()
+        
+        response_data = {
+            'session_id': str(session.session_id),
+            'trolley_id': trolley.trolley_id,
+            'trolley_locked': trolley.is_locked,
+            'is_new_session': is_new_session,
+            'cart_items_count': cart_items_count,
+            'message': 'Session started successfully' if is_new_session else 'Continuing existing session'
+        }
+        
+        return Response(
+            response_data, 
+            status=status.HTTP_201_CREATED if is_new_session else status.HTTP_200_OK
+        )
 
