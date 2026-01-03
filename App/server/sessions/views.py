@@ -145,6 +145,7 @@ class SessionEndView(APIView):
     """
     POST /api/session/end
     End a shopping session and clear the cart.
+    Unassigns trolley from user (assigned_to = None) after payment.
     """
     
     def post(self, request):
@@ -175,17 +176,22 @@ class SessionEndView(APIView):
         # End the session
         session.end_session()
         
-        # Lock the trolley
+        # Lock the trolley and unassign from user
         trolley = session.trolley
         trolley.is_locked = True
-        trolley.save(update_fields=['is_locked', 'last_seen'])
+        trolley.assigned_to = None
+        trolley.assigned_at = None
+        trolley.save(update_fields=['is_locked', 'last_seen', 'assigned_to', 'assigned_at'])
         
-        return Response({
+        response_data = {
             'session_id': str(session.session_id),
             'trolley_id': trolley.trolley_id,
             'items_cleared': cart_items_count,
-            'message': 'Session ended successfully'
-        })
+            'trolley_unassigned': True,
+            'message': 'Session ended successfully and trolley unassigned'
+        }
+        
+        return Response(response_data)
 
 
 class SessionQRScanView(APIView):
@@ -194,6 +200,7 @@ class SessionQRScanView(APIView):
     Handle QR code scan from user device.
     Creates a new session or returns existing active session for the trolley.
     This is the entry point when user scans trolley QR code.
+    Prevents usage if trolley is already assigned to another user.
     """
     
     def post(self, request):
@@ -202,6 +209,7 @@ class SessionQRScanView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         trolley_id = serializer.validated_data['trolley_id']
+        user_id = request.query_params.get('user_id') or request.data.get('user_id')
         
         # Check if trolley exists
         try:
@@ -219,6 +227,25 @@ class SessionQRScanView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Check if trolley is already assigned to another user
+        if trolley.assigned_to is not None:
+            # Trolley is assigned to someone else
+            if user_id and str(trolley.assigned_to.id) == str(user_id):
+                # Same user can continue their session
+                pass
+            else:
+                # Different user or no user trying to access an assigned trolley
+                return Response(
+                    {
+                        'error': 'Trolley is already in use',
+                        'message': f'This trolley is currently assigned to another user ({trolley.assigned_to.username}). Please use a different trolley or wait until the current session is completed.',
+                        'trolley_id': trolley_id,
+                        'assigned_to': trolley.assigned_to.username,
+                        'assigned_at': trolley.assigned_at.isoformat() if trolley.assigned_at else None
+                    },
+                    status=status.HTTP_409_CONFLICT
+                )
+        
         # Check for existing active session
         existing_session = Session.objects.filter(
             trolley=trolley, 
@@ -233,6 +260,9 @@ class SessionQRScanView(APIView):
                 # Clear old cart and end session
                 CartItem.objects.filter(session=existing_session).delete()
                 existing_session.end_session()
+                # Unassign the trolley from previous user
+                trolley.assigned_to = None
+                trolley.assigned_at = None
                 # Create new session
                 session = Session.objects.create(trolley=trolley)
                 is_new_session = True
@@ -246,10 +276,24 @@ class SessionQRScanView(APIView):
             session = Session.objects.create(trolley=trolley)
             is_new_session = True
         
+        # Assign trolley to user if user_id provided
+        if user_id and is_new_session:
+            from django.contrib.auth.models import User
+            try:
+                user = User.objects.get(id=user_id)
+                trolley.assigned_to = user
+                trolley.assigned_at = timezone.now()
+                session.user = user
+                session.save()
+            except User.DoesNotExist:
+                pass  # User ID not found, continue without assignment
+        
         # Unlock the trolley
         if trolley.is_locked:
             trolley.is_locked = False
-            trolley.save(update_fields=['is_locked', 'last_seen'])
+            trolley.save(update_fields=['is_locked', 'last_seen', 'assigned_to', 'assigned_at'])
+        else:
+            trolley.save(update_fields=['last_seen', 'assigned_to', 'assigned_at'])
         
         # Get cart items count
         cart_items_count = CartItem.objects.filter(session=session).count()
@@ -259,6 +303,9 @@ class SessionQRScanView(APIView):
             'trolley_id': trolley.trolley_id,
             'trolley_locked': trolley.is_locked,
             'is_new_session': is_new_session,
+            'is_assigned': trolley.assigned_to is not None,
+            'assigned_to': trolley.assigned_to.username if trolley.assigned_to else None,
+            'assigned_at': trolley.assigned_at.isoformat() if trolley.assigned_at else None,
             'cart_items_count': cart_items_count,
             'message': 'Session started successfully' if is_new_session else 'Continuing existing session'
         }

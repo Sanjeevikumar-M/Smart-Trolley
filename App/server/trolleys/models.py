@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 import hashlib
 import json
 
@@ -13,6 +14,8 @@ class Trolley(models.Model):
     qr_code_data = models.CharField(max_length=255, blank=True, help_text="Data encoded in QR code")
     is_active = models.BooleanField(default=True)
     is_locked = models.BooleanField(default=True)
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_trolleys', help_text="User currently using this trolley")
+    assigned_at = models.DateTimeField(null=True, blank=True, help_text="When trolley was assigned to user")
     last_seen = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
