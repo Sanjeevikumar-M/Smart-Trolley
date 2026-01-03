@@ -63,109 +63,89 @@ export const api = {
     }
   },
 
-  // Products - get details when ESP32 scans
-  async getProduct(id) {
-    return this.request(`/products/${id}/`);
-  },
-
-  async getProducts() {
-    return this.request('/products/');
-  },
-
-  // Cart - synced with backend
-  async getCart(sessionId) {
-    return this.request(`/cart/?session_id=${sessionId}`);
-  },
-
-  // ESP32 Product Scanning Endpoint
-  // Called when user scans product barcode with ESP32 device in trolley
-  async addScannedProduct(sessionId, productId) {
-    return this.request('/cart/scan-product/', {
+  // User Management
+  async signupUser(name, phoneNumber, email = '') {
+    return this.request('/user/signup', {
       method: 'POST',
       body: JSON.stringify({
-        session_id: sessionId,
-        product_id: productId,
+        name,
+        phone_number: phoneNumber,
+        email,
       }),
     });
   },
 
-  async updateCartItem(sessionId, productId, quantity) {
-    return this.request('/cart/', {
-      method: 'PUT',
-      body: JSON.stringify({
-        session_id: sessionId,
-        product_id: productId,
-        quantity,
-      }),
-    });
-  },
-
-  async removeFromCart(sessionId, productId) {
-    return this.request(`/cart/${productId}/?session_id=${sessionId}`, {
-      method: 'DELETE',
-    });
-  },
-
-  // Checkout & Orders
-  async createOrder(sessionId, cartItems, shippingInfo = {}) {
-    return this.request('/payments/', {
-      method: 'POST',
-      body: JSON.stringify({
-        session_id: sessionId,
-        items: cartItems,
-        shipping_info: shippingInfo,
-      }),
-    });
-  },
-
-  async getOrderStatus(orderId) {
-    return this.request(`/payments/${orderId}/`);
-  },
-
-  // Trolley/Device Management
-  async getTrolleyInfo(trolleyId) {
-    return this.request(`/trolleys/${trolleyId}/`);
-  },
-
-  async getTrolleys() {
-    return this.request('/trolleys/');
-  },
-
-  async connectTrolley(trolleyId, sessionId) {
-    return this.request(`/trolleys/${trolleyId}/connect/`, {
-      method: 'POST',
-      body: JSON.stringify({
-        session_id: sessionId,
-      }),
-    });
-  },
-
-  async disconnectTrolley(trolleyId, sessionId) {
-    return this.request(`/trolleys/${trolleyId}/disconnect/`, {
-      method: 'POST',
-      body: JSON.stringify({
-        session_id: sessionId,
-      }),
-    });
-  },
-
-  // Session Management - linked to trolley
-  async createSession(trolleyId) {
-    return this.request('/sessions/', {
+  // Session Management
+  async startSession(trolleyId, userId = null) {
+    return this.request('/session/start', {
       method: 'POST',
       body: JSON.stringify({
         trolley_id: trolleyId,
+        ...(userId && { user_id: userId }),
       }),
     });
   },
 
-  async getSessionInfo(sessionId) {
-    return this.request(`/sessions/${sessionId}/`);
+  async sessionHeartbeat(sessionId) {
+    return this.request('/session/heartbeat', {
+      method: 'POST',
+      body: JSON.stringify({
+        session_id: sessionId,
+      }),
+    });
   },
 
-  // Polling for real-time product updates from ESP32
-  async getPendingProducts(sessionId) {
-    return this.request(`/cart/pending/?session_id=${sessionId}`);
+  async endSession(sessionId) {
+    return this.request('/session/end', {
+      method: 'POST',
+      body: JSON.stringify({
+        session_id: sessionId,
+      }),
+    });
+  },
+
+  // Cart Management
+  async scanProduct(sessionId, barcode) {
+    return this.request('/cart/scan', {
+      method: 'POST',
+      body: JSON.stringify({
+        session_id: sessionId,
+        barcode,
+      }),
+    });
+  },
+
+  async removeFromCart(sessionId, barcode) {
+    return this.request('/cart/remove', {
+      method: 'POST',
+      body: JSON.stringify({
+        session_id: sessionId,
+        barcode,
+      }),
+    });
+  },
+
+  async viewCart(sessionId) {
+    return this.request(`/cart/view?session_id=${sessionId}`);
+  },
+
+  // Payment Management
+  async createPayment(sessionId) {
+    return this.request('/payment/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        session_id: sessionId,
+      }),
+    });
+  },
+
+  async confirmPayment(sessionId) {
+    return this.request('/payment/confirm', {
+      method: 'POST',
+      body: JSON.stringify({
+        session_id: sessionId,
+      }),
+    });
   },
 };
 
