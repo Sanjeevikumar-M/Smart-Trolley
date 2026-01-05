@@ -1,11 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import sessionManager from '../utils/sessionManager';
 import api from '../utils/api';
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const [cart] = useState(sessionManager.getCart());
+  const [cart, setCart] = useState(sessionManager.getCart());
+  
+  // Fetch cart from backend on component mount
+  useEffect(() => {
+    const fetchCart = async () => {
+      try {
+        const sessionId = sessionManager.getSessionId();
+        if (!sessionId || sessionId.includes('unknown')) {
+          return;
+        }
+        const cartData = await api.getCart(sessionId);
+        if (cartData && cartData.items) {
+          // Flatten the items structure
+          const flattenedItems = cartData.items.map((item) => ({
+            id: item.product.barcode,
+            ...item.product,
+            quantity: item.quantity,
+            subtotal: item.subtotal,
+          }));
+          
+          const updatedCart = {
+            items: flattenedItems,
+            total: typeof cartData.total === 'string' ? parseFloat(cartData.total) : (cartData.total || 0),
+          };
+          
+          setCart(updatedCart);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch cart from API:', err);
+        // Fall back to local cart
+        setCart(sessionManager.getCart());
+      }
+    };
+    
+    fetchCart();
+  }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
@@ -14,6 +49,7 @@ export default function Checkout() {
     phone: '',
   });
   const [step, setStep] = useState(1);
+  const [paymentMethod, setPaymentMethod] = useState('cash'); // Add payment method state
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -45,13 +81,18 @@ export default function Checkout() {
       const sessionId = sessionManager.getSessionId();
 
       try {
-        await api.createOrder(sessionId, cart.items, {
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-        });
-      } catch {
-        console.debug('API not available, using local checkout');
+        // Create payment on backend
+        const paymentResponse = await api.createPayment(sessionId);
+        console.log('Payment created:', paymentResponse);
+        
+        // After payment is created, confirm the payment to expire session
+        if (paymentResponse && paymentResponse.session_id) {
+          await api.confirmPayment(sessionId);
+          console.log('Payment confirmed, session should be expired');
+        }
+      } catch (apiErr) {
+        console.warn('API payment failed:', apiErr);
+        // Continue anyway - user might complete payment manually
       }
 
       sessionManager.clearCart();
@@ -264,24 +305,45 @@ export default function Checkout() {
                 <div className="grid grid-cols-3 gap-3">
                   <button
                     type="button"
-                    className="p-4 border-2 border-indigo-500 bg-indigo-50 rounded-xl text-center transition-all"
+                    onClick={() => setPaymentMethod('cash')}
+                    className={`p-4 border-2 rounded-xl text-center transition-all ${
+                      paymentMethod === 'cash'
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
                   >
                     <span className="text-2xl block mb-1">💵</span>
-                    <span className="text-xs font-medium text-gray-700">Cash</span>
+                    <span className={`text-xs font-medium ${
+                      paymentMethod === 'cash' ? 'text-indigo-700' : 'text-gray-500'
+                    }`}>Cash</span>
                   </button>
                   <button
                     type="button"
-                    className="p-4 border-2 border-gray-200 rounded-xl text-center hover:border-gray-300 transition-all"
+                    onClick={() => setPaymentMethod('card')}
+                    className={`p-4 border-2 rounded-xl text-center transition-all ${
+                      paymentMethod === 'card'
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
                   >
                     <span className="text-2xl block mb-1">💳</span>
-                    <span className="text-xs font-medium text-gray-500">Card</span>
+                    <span className={`text-xs font-medium ${
+                      paymentMethod === 'card' ? 'text-indigo-700' : 'text-gray-500'
+                    }`}>Card</span>
                   </button>
                   <button
                     type="button"
-                    className="p-4 border-2 border-gray-200 rounded-xl text-center hover:border-gray-300 transition-all"
+                    onClick={() => setPaymentMethod('upi')}
+                    className={`p-4 border-2 rounded-xl text-center transition-all ${
+                      paymentMethod === 'upi'
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
                   >
                     <span className="text-2xl block mb-1">📱</span>
-                    <span className="text-xs font-medium text-gray-500">UPI</span>
+                    <span className={`text-xs font-medium ${
+                      paymentMethod === 'upi' ? 'text-indigo-700' : 'text-gray-500'
+                    }`}>UPI</span>
                   </button>
                 </div>
               </div>

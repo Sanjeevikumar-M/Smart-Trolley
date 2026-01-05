@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import sessionManager from '../utils/sessionManager';
+import heartbeatManager from '../utils/heartbeatManager';
 import api from '../utils/api';
 
 export default function Cart() {
@@ -22,6 +23,10 @@ export default function Cart() {
     
     setHasSession(true);
     sessionManager.updateLastActivity();
+    
+    // Start heartbeat to keep session alive
+    heartbeatManager.start();
+    
     fetchCart();
 
     const pollInterval = setInterval(() => {
@@ -30,7 +35,10 @@ export default function Cart() {
       }
     }, 2000);
 
-    return () => clearInterval(pollInterval);
+    return () => {
+      clearInterval(pollInterval);
+      // Don't stop heartbeat here - let it run as long as user is in the app
+    };
   }, [pollingActive]);
 
   const fetchCart = async () => {
@@ -46,9 +54,23 @@ export default function Cart() {
       try {
         const cartData = await api.getCart(sessionId);
         if (cartData && cartData.items) {
-          setCart(cartData);
-          sessionManager.getCart().items = cartData.items;
-          sessionManager.getCart().total = cartData.total || 0;
+          // Flatten the items structure to include product details at item level
+          const flattenedItems = cartData.items.map((item) => ({
+            id: item.product.barcode, // Use barcode as unique ID
+            ...item.product,
+            quantity: item.quantity,
+            subtotal: item.subtotal,
+          }));
+          
+          const cart = {
+            items: flattenedItems,
+            total: typeof cartData.total === 'string' ? parseFloat(cartData.total) : (cartData.total || 0),
+          };
+          
+          setCart(cart);
+          // Update local storage
+          sessionManager.getCart().items = flattenedItems;
+          sessionManager.getCart().total = cart.total;
         }
       } catch (err) {
         console.warn('Failed to fetch from API, using local cart:', err);
@@ -63,32 +85,102 @@ export default function Cart() {
   const checkForNewProducts = async () => {
     try {
       const sessionId = sessionManager.getSessionId();
-      const pendingProducts = await api.getPendingProducts(sessionId);
-      
-      if (pendingProducts && pendingProducts.length > 0) {
-        let updatedCart = sessionManager.getCart();
-        pendingProducts.forEach(product => {
-          updatedCart = sessionManager.addScannedProduct(product);
-        });
-        setCart(updatedCart);
+      if (!sessionId || sessionId.includes('unknown')) {
+        return;
       }
-    } catch {
-      // Silent fail
+      
+      // Fetch latest cart from backend
+      const cartData = await api.getCart(sessionId);
+      if (cartData && cartData.items) {
+        // Flatten the items structure
+        const flattenedItems = cartData.items.map((item) => ({
+          id: item.product.barcode,
+          ...item.product,
+          quantity: item.quantity,
+          subtotal: item.subtotal,
+        }));
+        
+        const updatedCart = {
+          items: flattenedItems,
+          total: typeof cartData.total === 'string' ? parseFloat(cartData.total) : (cartData.total || 0),
+        };
+        
+        setCart(updatedCart);
+        // Update local storage
+        sessionManager.getCart().items = flattenedItems;
+        sessionManager.getCart().total = updatedCart.total;
+      }
+    } catch (err) {
+      console.debug('Failed to fetch updated cart:', err);
+      // Silent fail - cart might be expired
     }
   };
 
-  const handleUpdateQuantity = (productId, quantity) => {
-    if (quantity <= 0) {
-      handleRemoveFromCart(productId);
+  const handleUpdateQuantity = async (itemId, newQuantity) => {
+    if (newQuantity <= 0) {
+      handleRemoveFromCart(itemId);
       return;
     }
-    const updatedCart = sessionManager.updateCartItem(productId, quantity);
-    setCart(updatedCart);
+    
+    try {
+      const sessionId = sessionManager.getSessionId();
+      const barcode = itemId; // itemId is the barcode
+      
+      // Find the current item
+      const currentItem = cart.items.find(item => item.id === itemId);
+      if (!currentItem) return;
+      
+      const currentQuantity = currentItem.quantity || 1;
+      const difference = newQuantity - currentQuantity;
+      
+      if (difference > 0) {
+        // Add more items by scanning multiple times
+        for (let i = 0; i < difference; i++) {
+          await api.scanProduct(sessionId, barcode);
+        }
+      } else if (difference < 0) {
+        // Remove items one by one (decreases quantity)
+        for (let i = 0; i < Math.abs(difference); i++) {
+          await api.removeFromCart(sessionId, barcode);
+        }
+      }
+      
+      // Refresh cart from backend
+      await fetchCart();
+    } catch (err) {
+      console.error('Failed to update quantity:', err);
+      // Fallback to local update
+      const updatedCart = sessionManager.updateCartItem(itemId, newQuantity);
+      setCart(updatedCart);
+    }
   };
 
-  const handleRemoveFromCart = (productId) => {
-    const updatedCart = sessionManager.removeFromCart(productId);
-    setCart(updatedCart);
+  const handleRemoveFromCart = async (itemId) => {
+    if (!window.confirm('Remove this item from cart?')) {
+      return;
+    }
+    
+    try {
+      const sessionId = sessionManager.getSessionId();
+      const barcode = itemId; // itemId is the barcode
+      
+      // Find the item to get its quantity
+      const item = cart.items.find(i => i.id === itemId);
+      if (!item) return;
+      
+      // Remove all quantities by calling remove multiple times
+      for (let i = 0; i < (item.quantity || 1); i++) {
+        await api.removeFromCart(sessionId, barcode);
+      }
+      
+      // Refresh cart from backend
+      await fetchCart();
+    } catch (err) {
+      console.error('Failed to remove from cart:', err);
+      // Fallback to local update
+      const updatedCart = sessionManager.removeFromCart(itemId);
+      setCart(updatedCart);
+    }
   };
 
   const handleClearCart = () => {
@@ -200,28 +292,36 @@ export default function Cart() {
 
             {/* Items List */}
             <div className="space-y-3">
-              {cartItems.map((item, index) => (
+              {cartItems.map((item, index) => {
+                // Handle both flattened and nested product structure
+                const product = item.product || item;
+                const name = product.name || 'Unknown Product';
+                const price = typeof product.price === 'string' ? parseFloat(product.price) : (product.price || 0);
+                const quantity = item.quantity || 1;
+                const itemId = item.id || item.barcode || index;
+                
+                return (
                 <div
-                  key={item.id}
+                  key={itemId}
                   className="card-product p-4 animate-slide-in"
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
                   <div className="flex items-center gap-4">
                     {/* Product Image */}
                     <div className="w-14 h-14 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center text-2xl shrink-0">
-                      {item.image || '📦'}
+                      {product.image || '📦'}
                     </div>
 
                     {/* Product Info */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{item.name}</h3>
+                      <h3 className="font-semibold text-gray-900 truncate">{name}</h3>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-lg font-bold text-indigo-600">
-                          ${(item.price * (item.quantity || 1)).toFixed(2)}
+                          ${(price * quantity).toFixed(2)}
                         </span>
-                        {item.quantity > 1 && (
+                        {quantity > 1 && (
                           <span className="text-xs text-gray-500">
-                            (${item.price?.toFixed(2)} × {item.quantity})
+                            (${price.toFixed(2)} × {quantity})
                           </span>
                         )}
                       </div>
@@ -230,16 +330,16 @@ export default function Cart() {
                     {/* Quantity Controls */}
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => handleUpdateQuantity(item.id, (item.quantity || 1) - 1)}
+                        onClick={() => handleUpdateQuantity(itemId, quantity - 1)}
                         className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center text-lg font-semibold transition-colors"
                       >
                         −
                       </button>
                       <span className="w-8 text-center font-semibold text-gray-900">
-                        {item.quantity || 1}
+                        {quantity}
                       </span>
                       <button
-                        onClick={() => handleUpdateQuantity(item.id, (item.quantity || 1) + 1)}
+                        onClick={() => handleUpdateQuantity(itemId, quantity + 1)}
                         className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center text-lg font-semibold transition-colors"
                       >
                         +
@@ -248,14 +348,15 @@ export default function Cart() {
 
                     {/* Delete Button */}
                     <button
-                      onClick={() => handleRemoveFromCart(item.id)}
+                      onClick={() => handleRemoveFromCart(itemId)}
                       className="w-8 h-8 text-red-500 hover:bg-red-50 rounded-lg flex items-center justify-center transition-colors"
                     >
                       ✕
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

@@ -126,6 +126,12 @@ export const sessionManager = {
     localStorage.removeItem(CART_KEY);
   },
 
+  // Clear entire session (called after checkout is complete)
+  clearSession() {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(CART_KEY);
+  },
+
   getCartItemCount() {
     const cart = this.getCart();
     return cart.items.reduce((sum, item) => sum + (parseInt(item.quantity) || 1), 0);

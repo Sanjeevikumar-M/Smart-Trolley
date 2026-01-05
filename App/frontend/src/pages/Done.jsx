@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import sessionManager from '../utils/sessionManager';
+import heartbeatManager from '../utils/heartbeatManager';
+import api from '../utils/api';
 
 const CONFETTI_COLORS = ['#6366f1', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899'];
 
@@ -46,6 +48,51 @@ export default function Done() {
 
   useEffect(() => {
     sessionManager.updateLastActivity();
+    
+    // Stop heartbeat manager since session will be ended
+    heartbeatManager.stop();
+    
+    // Confirm payment and expire session on this page
+    const confirmPaymentAndEndSession = async () => {
+      const sessionId = sessionManager.getSessionId();
+      
+      try {
+        if (!sessionId || sessionId.includes('unknown')) {
+          console.warn('No valid session to end');
+          return;
+        }
+        
+        console.log('Starting payment confirmation for session:', sessionId);
+        
+        // Confirm payment (which expires the session on backend)
+        try {
+          await api.confirmPayment(sessionId);
+          console.log('✓ Payment confirmed and session expired on backend');
+        } catch (confirmErr) {
+          console.error('✗ Payment confirmation failed:', confirmErr);
+          // Continue to try ending session anyway
+        }
+        
+        // End the session on backend
+        try {
+          await api.endSession(sessionId);
+          console.log('✓ Session ended on backend, trolley should be freed');
+        } catch (endErr) {
+          console.error('✗ Session end failed:', endErr);
+        }
+        
+        // Clear local session and cart data
+        sessionManager.clearSession();
+        console.log('✓ Local session and cart cleared');
+        
+      } catch (err) {
+        console.error('Unexpected error during session cleanup:', err);
+        // Clear local data anyway
+        sessionManager.clearSession();
+      }
+    };
+    
+    confirmPaymentAndEndSession();
     
     // Hide confetti after animation
     const timer = setTimeout(() => setShowConfetti(false), 4000);

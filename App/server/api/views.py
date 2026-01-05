@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import ValidationError
 
 from smarttrolley.settings import SESSION_TIMEOUT_SECONDS
 
@@ -93,8 +94,25 @@ class SessionEndView(APIView):
 		session_id = serializer.validated_data['session_id']
 
 		with transaction.atomic():
-			session = get_locked_session(session_id, SESSION_TIMEOUT_SECONDS)
-			expire_session(session)
+			try:
+				# Try to get active session
+				session = get_locked_session(session_id, SESSION_TIMEOUT_SECONDS)
+				expire_session(session)
+			except ValidationError as e:
+				# Session is already inactive, that's fine
+				if 'Session is inactive' in str(e):
+					# Fetch session without timeout check
+					try:
+						session = Session.objects.select_for_update().select_related('trolley').get(session_id=session_id)
+						# Make sure trolley is freed even if session was already expired
+						if session.trolley.is_assigned:
+							session.trolley.is_assigned = False
+							session.trolley.last_seen = timezone.now()
+							session.trolley.save(update_fields=['is_assigned', 'last_seen'])
+					except Session.DoesNotExist:
+						pass
+				else:
+					raise
 		return Response({'status': 'ended'})
 
 
@@ -158,7 +176,14 @@ class CartRemoveView(APIView):
 			if not cart_item:
 				return Response({'detail': 'Item not in cart'}, status=status.HTTP_404_NOT_FOUND)
 
-			cart_item.delete()
+			# Decrease quantity by 1, or remove if quantity becomes 0
+			if cart_item.quantity > 1:
+				cart_item.quantity -= 1
+				cart_item.subtotal = (product.price * cart_item.quantity).quantize(Decimal('0.01'))
+				cart_item.save(update_fields=['quantity', 'subtotal'])
+			else:
+				cart_item.delete()
+				
 			refresh_activity(session)
 			total = calculate_cart_total(session)
 
@@ -186,8 +211,15 @@ class PaymentCreateView(APIView):
 
 		with transaction.atomic():
 			session = get_locked_session(session_id, SESSION_TIMEOUT_SECONDS)
+			
+			# Create a user if session doesn't have one
 			if not session.user:
-				return Response({'detail': 'Billing user required for payment'}, status=status.HTTP_400_BAD_REQUEST)
+				user = User.objects.create(
+					name='Guest User',
+					phone_number='0000000000',
+				)
+				session.user = user
+				session.save(update_fields=['user'])
 
 			total = calculate_cart_total(session)
 			payment = Payment.objects.create(
