@@ -8,8 +8,19 @@ export default function Cart() {
   const [cart, setCart] = useState({ items: [], total: 0 });
   const [loading, setLoading] = useState(true);
   const [pollingActive, setPollingActive] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
+    // Check if user has a valid session
+    const session = sessionManager.getSession();
+    if (!session || !session.trolleyId || session.trolleyId === 'unknown') {
+      // No valid session - redirect to connect
+      setHasSession(false);
+      setLoading(false);
+      return;
+    }
+    
+    setHasSession(true);
     sessionManager.updateLastActivity();
     fetchCart();
 
@@ -26,15 +37,23 @@ export default function Cart() {
     try {
       setLoading(true);
       const sessionId = sessionManager.getSessionId();
+      if (!sessionId || sessionId.includes('unknown')) {
+        // No valid session
+        setCart({ items: [], total: 0 });
+        return;
+      }
+      
       try {
         const cartData = await api.getCart(sessionId);
-        if (cartData) {
+        if (cartData && cartData.items) {
           setCart(cartData);
           sessionManager.getCart().items = cartData.items;
-          sessionManager.getCart().total = cartData.total;
+          sessionManager.getCart().total = cartData.total || 0;
         }
-      } catch {
-        setCart(sessionManager.getCart());
+      } catch (err) {
+        console.warn('Failed to fetch from API, using local cart:', err);
+        const localCart = sessionManager.getCart();
+        setCart(localCart);
       }
     } finally {
       setLoading(false);
@@ -79,13 +98,34 @@ export default function Cart() {
     }
   };
 
-  const cartItems = cart.items || [];
-  const itemCount = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  const cartItems = cart?.items || [];
+  const itemCount = cartItems.reduce((sum, item) => sum + (item?.quantity || 1), 0);
   const trolleyId = sessionManager.getTrolleyId();
+  const totalAmount = typeof cart?.total === 'string' ? parseFloat(cart.total) : (cart?.total || 0);
 
   return (
     <div className="min-h-screen pt-20 pb-32">
-      {/* Header */}
+      {/* No Session Redirect */}
+      {!hasSession && !loading && (
+        <div className="text-center py-16 animate-slide-in">
+          <div className="w-32 h-32 mx-auto bg-gradient-to-br from-amber-100 to-orange-200 rounded-full flex items-center justify-center mb-6">
+            <span className="text-6xl">⚠️</span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">No Trolley Connected</h2>
+          <p className="text-gray-500 mb-8">Please connect to a trolley first to start shopping</p>
+          
+          <button
+            onClick={() => navigate('/connect', { replace: true })}
+            className="inline-flex items-center gap-2 btn-primary"
+          >
+            <span>📷</span>
+            Connect to Trolley
+          </button>
+        </div>
+      )}
+
+      {hasSession && (
+      <>
       <div className="glass sticky top-16 z-40 border-b border-white/20">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -228,7 +268,7 @@ export default function Cart() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-sm text-gray-500">Total ({itemCount} items)</p>
-                <p className="text-3xl font-bold text-gradient">${cart.total?.toFixed(2) || '0.00'}</p>
+                <p className="text-3xl font-bold text-gradient">${totalAmount.toFixed(2)}</p>
               </div>
               <button
                 onClick={handleClearCart}
@@ -246,6 +286,8 @@ export default function Cart() {
             </button>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

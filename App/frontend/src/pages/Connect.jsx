@@ -35,16 +35,26 @@ export default function Connect() {
         return;
       }
 
-      const session = sessionManager.createSession(trolleyId.trim().toUpperCase());
+      const trolleyIdUpper = trolleyId.trim().toUpperCase();
 
-      // Try to verify trolley exists
+      // Create session on backend
       try {
-        const trolleyInfo = await api.getTrolleyInfo(trolleyId.trim().toUpperCase());
-        if (trolleyInfo) {
-          await api.connectTrolley(trolleyId.trim().toUpperCase(), session.id);
+        const response = await api.startSession(trolleyIdUpper);
+        if (response && response.session_id) {
+          // Backend session created successfully, store it locally
+          const session = {
+            id: response.session_id,
+            trolleyId: trolleyIdUpper,
+            createdAt: new Date().toISOString(),
+            lastActivity: new Date().toISOString(),
+          };
+          localStorage.setItem('smart_trolley_session', JSON.stringify(session));
         }
       } catch (apiErr) {
-        console.debug('API not available, using local session:', apiErr);
+        console.error('Backend session creation failed:', apiErr);
+        // If backend fails, create local session as fallback
+        sessionManager.createSession(trolleyIdUpper);
+        setError(`Warning: Connected offline. Backend error: ${apiErr.message}`);
       }
 
       // Show success animation

@@ -129,6 +129,18 @@ export const api = {
     return this.request(`/cart/view?session_id=${sessionId}`);
   },
 
+  // Alias for viewCart to match Cart.jsx usage
+  async getCart(sessionId) {
+    return this.viewCart(sessionId);
+  },
+
+  // Get pending products (ESP32 scanned products waiting to be added)
+  async getPendingProducts(sessionId) {
+    // This endpoint doesn't exist yet in backend, return empty array
+    // TODO: Implement in backend if ESP32 integration is needed
+    return [];
+  },
+
   // Payment Management
   async createPayment(sessionId) {
     return this.request('/payment/create', {

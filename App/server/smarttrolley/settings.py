@@ -87,6 +87,9 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# URL Configuration
+APPEND_SLASH = False  # Disable automatic slash appending for API endpoints
+
 CORS_ALLOW_ALL_ORIGINS = True
 
 REST_FRAMEWORK = {
