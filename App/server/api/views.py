@@ -13,13 +13,14 @@ from .models import CartItem, Payment, Product, Session, Trolley, User
 from .serializers import (
 	CartRemoveSerializer,
 	CartScanSerializer,
+	CartScanTrolleySerializer,
 	CartViewSerializer,
 	CartItemSerializer,
 	SessionIdSerializer,
 	SessionStartSerializer,
 	UserSignupSerializer,
 )
-from .utils import calculate_cart_total, expire_session, get_locked_session, refresh_activity
+from .utils import calculate_cart_total, expire_session, get_locked_session, get_locked_session_by_trolley, refresh_activity
 
 
 class UserSignupView(APIView):
@@ -118,13 +119,30 @@ class SessionEndView(APIView):
 
 class CartScanView(APIView):
 	def post(self, request):
-		serializer = CartScanSerializer(data=request.data)
+		# Support both session_id (frontend) and trolley_id (ESP32)
+		has_session_id = 'session_id' in request.data
+		has_trolley_id = 'trolley_id' in request.data
+		
+		if has_session_id:
+			serializer = CartScanSerializer(data=request.data)
+		elif has_trolley_id:
+			serializer = CartScanTrolleySerializer(data=request.data)
+		else:
+			return Response(
+				{'detail': 'Either session_id or trolley_id is required'},
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
 		serializer.is_valid(raise_exception=True)
-		session_id = serializer.validated_data['session_id']
 		barcode = serializer.validated_data['barcode']
 
 		with transaction.atomic():
-			session = get_locked_session(session_id, SESSION_TIMEOUT_SECONDS)
+			if has_session_id:
+				session_id = serializer.validated_data['session_id']
+				session = get_locked_session(session_id, SESSION_TIMEOUT_SECONDS)
+			else:
+				trolley_id = serializer.validated_data['trolley_id']
+				session = get_locked_session_by_trolley(trolley_id, SESSION_TIMEOUT_SECONDS)
 			try:
 				product = Product.objects.get(barcode=barcode, is_active=True)
 			except Product.DoesNotExist:

@@ -30,6 +30,12 @@ class CartScanSerializer(SessionIdSerializer):
     barcode = serializers.CharField(max_length=64)
 
 
+class CartScanTrolleySerializer(serializers.Serializer):
+    """Serializer for ESP32 product scans using trolley_id instead of session_id"""
+    trolley_id = serializers.CharField(max_length=50)
+    barcode = serializers.CharField(max_length=64)
+
+
 class CartRemoveSerializer(SessionIdSerializer):
     barcode = serializers.CharField(max_length=64)
 

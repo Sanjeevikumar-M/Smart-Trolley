@@ -43,6 +43,27 @@ def get_locked_session(session_id, timeout_seconds: int) -> Session:
         return session
 
 
+def get_locked_session_by_trolley(trolley_id: str, timeout_seconds: int) -> Session:
+    """Get active session for a trolley (used by ESP32 product scans)"""
+    with transaction.atomic():
+        try:
+            session = (
+                Session.objects.select_for_update()
+                .select_related('trolley', 'user')
+                .filter(trolley__trolley_id=trolley_id, is_active=True)
+                .order_by('-created_at')
+                .first()
+            )
+        except Session.DoesNotExist as exc:
+            raise NotFound('No active session for this trolley') from exc
+        
+        if not session:
+            raise NotFound('No active session for this trolley')
+        
+        enforce_session_timeout(session, timeout_seconds)
+        return session
+
+
 def calculate_cart_total(session: Session) -> Decimal:
     total = Decimal('0.00')
     for item in session.cart_items.select_related('product'):
