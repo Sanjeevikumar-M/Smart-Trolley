@@ -16,3 +16,28 @@ Note: This will impact Vite dev & build performances.
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## UI/UX Design System
+
+This frontend has been polished for a more professional, consistent look:
+
+- Typography: Inter font via Google Fonts (see `index.html`).
+- Layout: A fixed, clean navbar and a unified page container (`Layout.jsx`).
+- Colors: Neutral slate base with indigo accents; custom utility styles in `src/index.css`.
+- Components: Simplified buttons and cards (`btn-primary`, `card`, `card-product`).
+
+### Tweaking the Theme
+- Change accent colors in `src/index.css` under CSS variables (e.g., `--primary`).
+- Extend Tailwind in `tailwind.config.js` for project-specific scales.
+- Page container sizing and spacing are managed in `components/Layout.jsx`.
+
+### Running Locally
+```bash
+npm install
+npm run dev
+```
+
+### Build
+```bash
+npm run build
+```
