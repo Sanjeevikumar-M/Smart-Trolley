@@ -16,10 +16,7 @@ export default function Navbar() {
     updateCartCount();
     const interval = setInterval(updateCartCount, 1000);
 
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
-    };
-
+    const handleScroll = () => setIsScrolled(window.scrollY > 4);
     window.addEventListener('scroll', handleScroll);
     return () => {
       clearInterval(interval);
@@ -32,54 +29,53 @@ export default function Navbar() {
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
-          ? 'glass shadow-lg'
-          : 'bg-transparent'
+        isScrolled ? 'bg-white/90 backdrop-blur border-b border-slate-200 shadow-sm' : 'bg-white/70 backdrop-blur'
       }`}
     >
-      <div className="max-w-6xl mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
-              <span className="text-white text-xl">🛒</span>
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="h-16 flex items-center justify-between">
+          {/* Brand */}
+          <Link to="/" className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md">
+              <span className="text-lg">🛒</span>
             </div>
-            <div className="hidden sm:block">
-              <h1 className="text-lg font-bold text-gradient">SmartTrolley</h1>
-              <p className="text-xs text-gray-500 -mt-1">Scan & Go</p>
+            <div className="leading-tight">
+              <span className="block text-base font-semibold text-slate-900">SmartTrolley</span>
+              <span className="block text-[11px] text-slate-500">Scan & Checkout</span>
             </div>
           </Link>
 
-          {/* Navigation Links */}
-          <div className="flex items-center gap-2 sm:gap-4">
+          {/* Navigation */}
+          <div className="flex items-center gap-1 sm:gap-2">
             <Link
-              to="/connect"
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
-                isActive('/connect')
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-white shadow-md hover:shadow-lg text-gray-700 hover:text-indigo-600'
+              to="/"
+              className={`hidden sm:flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive('/') ? 'text-indigo-600 bg-indigo-50' : 'text-slate-700 hover:text-indigo-600 hover:bg-slate-100'
               }`}
             >
-              <span>📷</span>
+              Home
+            </Link>
+            <Link
+              to="/connect"
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive('/connect') ? 'text-indigo-600 bg-indigo-50' : 'text-slate-700 hover:text-indigo-600 hover:bg-slate-100'
+              }`}
+            >
               <span className="hidden sm:inline">Scan</span>
+              <span className="sm:hidden">📷</span>
             </Link>
 
-            {/* Cart Button */}
-            <Link
-              to="/cart"
-              className="relative group"
-            >
+            {/* Cart */}
+            <Link to="/cart" className="relative">
               <div
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 ${
-                  isActive('/cart')
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
-                    : 'bg-white shadow-md hover:shadow-lg text-gray-700 hover:text-indigo-600'
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive('/cart') ? 'text-indigo-600 bg-indigo-50' : 'text-slate-700 hover:text-indigo-600 hover:bg-slate-100'
                 }`}
               >
-                <span className="text-lg">🛒</span>
-                <span className="hidden sm:inline text-sm font-medium">Cart</span>
+                <span className="text-base">🛒</span>
+                <span className="hidden sm:inline">Cart</span>
                 {cartCount > 0 && (
-                  <span className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg animate-bounce-in">
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-sm">
                     {cartCount}
                   </span>
                 )}

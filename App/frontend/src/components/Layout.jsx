@@ -6,10 +6,12 @@ export default function Layout() {
   const hideNavbar = location.pathname === '/done';
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen bg-slate-50">
       {!hideNavbar && <Navbar />}
-      <main className="flex-1">
-        <Outlet />
+      <main className="pt-20">
+        <div className="max-w-6xl mx-auto px-4 pb-16">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
