@@ -229,13 +229,7 @@ body {
 }
 
 /* Spin */
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
+/* Use Tailwind's built-in animate-spin */
 
 /* Scale In */
 @keyframes scaleIn {
@@ -248,14 +242,7 @@ body {
 }
 
 /* Bounce animation */
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-.animate-bounce {
-  animation: bounce 2s infinite;
-}
+/* Use Tailwind's built-in animate-bounce */
 
 /* QR Scanner Styles */
 #qr-scanner-container {
