@@ -21,7 +21,7 @@ class HeartbeatManager {
     }
 
     const session = sessionManager.getSession();
-    if (!session || !session.id || session.trolleyId === 'unknown') {
+    if (!session || !session.id) {
       console.debug('No valid session to send heartbeat');
       return;
     }
@@ -67,9 +67,13 @@ class HeartbeatManager {
       console.debug(`[${new Date().toLocaleTimeString()}] Heartbeat sent for session: ${sessionId}`);
     } catch (error) {
       console.warn('Heartbeat failed:', error.message);
-      // If heartbeat fails, stop trying (session might be expired)
-      if (error.status === 404 || error.message.includes('expired')) {
-        console.error('Session expired or not found, stopping heartbeat');
+      // If heartbeat fails due to expiry or missing session, stop and clear local session
+      const isInvalid = error?.status === 404 || error?.status === 400 || String(error?.message || '').toLowerCase().includes('expired');
+      if (isInvalid) {
+        console.error('Session invalid (expired/not found). Clearing and stopping heartbeat.');
+        try {
+          sessionManager.clearSession();
+        } catch (_) {}
         this.stop();
       }
     }

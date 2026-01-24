@@ -19,20 +19,18 @@ export const sessionManager = {
     return session;
   },
 
-  // Get or retrieve existing session
+  // Get session id if present; do NOT auto-create
   getSessionId() {
-    let session = JSON.parse(localStorage.getItem(SESSION_KEY));
-    if (!session) {
-      // Should not happen in normal flow - user must scan QR code first
-      // But as fallback, create anonymous session
-      session = this.createSession('unknown');
-    }
+    const sessionRaw = localStorage.getItem(SESSION_KEY);
+    if (!sessionRaw) return null;
+    const session = JSON.parse(sessionRaw);
+    if (!session || !session.id) return null;
 
-    // Check if session is expired
+    // Optional local timeout guard: if too old, clear
     const createdAt = new Date(session.createdAt).getTime();
-    if (Date.now() - createdAt > SESSION_TIMEOUT) {
-      // Session expired, create new one
-      return this.createSession(session.trolleyId).id;
+    if (Number.isFinite(createdAt) && Date.now() - createdAt > SESSION_TIMEOUT) {
+      this.clearSession();
+      return null;
     }
 
     return session.id;
@@ -50,10 +48,10 @@ export const sessionManager = {
     return session ? session.trolleyId : null;
   },
 
-  // Check if session is valid and belongs to a trolley
+  // Check if session is present and has trolley
   isValidSession() {
     const session = this.getSession();
-    return session && session.trolleyId && session.id;
+    return Boolean(session && session.trolleyId && session.id);
   },
 
   updateLastActivity() {
