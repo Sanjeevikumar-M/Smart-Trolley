@@ -15,7 +15,7 @@ export default function Cart() {
   useEffect(() => {
     // Check if user has a valid session
     const session = sessionManager.getSession();
-    if (!session || !session.trolleyId || session.trolleyId === 'unknown') {
+    if (!session || !session.trolleyId || !session.id) {
       // No valid session - redirect to connect
       setHasSession(false);
       setLoading(false);
@@ -46,9 +46,11 @@ export default function Cart() {
     try {
       setLoading(true);
       const sessionId = sessionManager.getSessionId();
-      if (!sessionId || sessionId.includes('unknown')) {
+      if (!sessionId) {
         // No valid session
         setCart({ items: [], total: 0 });
+        setHasSession(false);
+        heartbeatManager.stop();
         return;
       }
       
@@ -76,9 +78,17 @@ export default function Cart() {
           sessionManager.getCart().total = cart.total;
         }
       } catch (err) {
-        console.warn('Failed to fetch from API, using local cart:', err);
-        const localCart = sessionManager.getCart();
-        setCart(localCart);
+        console.warn('Failed to fetch from API:', err);
+        // If session invalid or expired, clear and mark as disconnected
+        if (err?.status === 404 || err?.status === 400) {
+          sessionManager.clearSession();
+          setHasSession(false);
+          heartbeatManager.stop();
+        } else {
+          // fallback to local cart
+          const localCart = sessionManager.getCart();
+          setCart(localCart);
+        }
       }
     } finally {
       setLoading(false);
@@ -88,7 +98,9 @@ export default function Cart() {
   const checkForNewProducts = async () => {
     try {
       const sessionId = sessionManager.getSessionId();
-      if (!sessionId || sessionId.includes('unknown')) {
+      if (!sessionId) {
+        setHasSession(false);
+        heartbeatManager.stop();
         return;
       }
       
@@ -116,7 +128,12 @@ export default function Cart() {
       }
     } catch (err) {
       console.debug('Failed to fetch updated cart:', err);
-      // Silent fail - cart might be expired
+      if (err?.status === 404 || err?.status === 400) {
+        sessionManager.clearSession();
+        setHasSession(false);
+        heartbeatManager.stop();
+      }
+      // Silent otherwise
     }
   };
 

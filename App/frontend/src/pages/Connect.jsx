@@ -37,6 +37,20 @@ export default function Connect() {
 
       const trolleyIdUpper = trolleyId.trim().toUpperCase();
 
+      // If an existing session is present, end it to free previous trolley
+      try {
+        const existing = sessionManager.getSession();
+        if (existing?.id) {
+          await api.endSession(existing.id);
+        }
+      } catch (endErr) {
+        // Non-fatal: continue connecting to new trolley
+        console.debug('Ending previous session failed (ignored):', endErr?.message || endErr);
+      } finally {
+        // Clear local state before creating a new session
+        sessionManager.clearSession();
+      }
+
       // Create session on backend
       try {
         const response = await api.startSession(trolleyIdUpper);

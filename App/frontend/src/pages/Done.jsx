@@ -24,7 +24,7 @@ export default function Done() {
       const sessionId = sessionManager.getSessionId();
       
       try {
-        if (!sessionId || sessionId.includes('unknown')) {
+        if (!sessionId) {
           console.warn('No valid session to end');
           return;
         }

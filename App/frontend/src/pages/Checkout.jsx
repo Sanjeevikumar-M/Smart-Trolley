@@ -13,7 +13,8 @@ export default function Checkout() {
     const fetchCart = async () => {
       try {
         const sessionId = sessionManager.getSessionId();
-        if (!sessionId || sessionId.includes('unknown')) {
+        if (!sessionId) {
+          // No valid session; ensure user reconnects
           return;
         }
         const cartData = await api.getCart(sessionId);
@@ -36,6 +37,10 @@ export default function Checkout() {
         }
       } catch (err) {
         console.warn('Failed to fetch cart from API:', err);
+        if (err?.status === 404 || err?.status === 400) {
+          // Session invalid; clear and redirect
+          sessionManager.clearSession();
+        }
         // Fall back to local cart
         setCart(sessionManager.getCart());
       }
@@ -81,6 +86,10 @@ export default function Checkout() {
     try {
       setLoading(true);
       const sessionId = sessionManager.getSessionId();
+      if (!sessionId) {
+        setError('Your session has expired. Please reconnect to a trolley.');
+        return;
+      }
 
       try {
         // Create payment on backend
