@@ -2,30 +2,54 @@ import { useEffect, useRef, useState } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
 export default function QRScanner({ onScan, onError }) {
-  const scannerRef = useRef(null);
-  const [hasCamera, setHasCamera] = useState(true);
+  // Single instance guard for Html5QrcodeScanner
+  const instanceRef = useRef(null);
+  const onScanRef = useRef(onScan);
+  const onErrorRef = useRef(onError);
+  const [hasCamera, setHasCamera] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState(null);
+  const [scanComplete, setScanComplete] = useState(false);
 
+  // Keep callbacks stable
+  useEffect(() => { onScanRef.current = onScan; }, [onScan]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
+
+  // Detect camera availability first
   useEffect(() => {
-    // Check if device has camera
+    let cancelled = false;
     navigator.mediaDevices
       .enumerateDevices()
       .then((devices) => {
+        if (cancelled) return;
         const hasVideo = devices.some((device) => device.kind === 'videoinput');
         setHasCamera(hasVideo);
-        if (hasVideo) setIsScanning(true);
+        setIsScanning(hasVideo);
+        if (!hasVideo) {
+          setError('Unable to access camera. Please check permissions.');
+          onErrorRef.current && onErrorRef.current('Camera access denied');
+        }
       })
       .catch(() => {
+        if (cancelled) return;
         setHasCamera(false);
         setError('Unable to access camera. Please check permissions.');
-        if (onError) onError('Camera access denied');
+        onErrorRef.current && onErrorRef.current('Camera access denied');
       });
+    return () => { cancelled = true; };
+  }, []);
 
-    if (!hasCamera) return;
+  // Initialize scanner once when camera is available
+  useEffect(() => {
+    if (!hasCamera || instanceRef.current || scanComplete) return;
+
+    const containerId = 'qr-scanner-container';
+    // Defensive: ensure container is clean before init
+    const el = document.getElementById(containerId);
+    if (el) el.innerHTML = '';
 
     const scanner = new Html5QrcodeScanner(
-      'qr-scanner-container',
+      containerId,
       {
         fps: 10,
         qrbox: { width: 220, height: 220 },
@@ -37,35 +61,83 @@ export default function QRScanner({ onScan, onError }) {
       false
     );
 
+    instanceRef.current = scanner;
+
     const handleScan = (decodedText) => {
       let trolleyId = null;
-
       if (decodedText.includes('trolley_id=')) {
         const match = decodedText.match(/trolley_id=([A-Z0-9_]+)/i);
         trolleyId = match ? match[1].toUpperCase() : null;
       } else if (decodedText.match(/^[A-Z0-9_]+$/i)) {
         trolleyId = decodedText.toUpperCase();
       }
-
-      if (trolleyId) {
+      if (trolleyId && !scanComplete) {
+        setScanComplete(true);
         setIsScanning(false);
-        scanner.clear().catch(() => {});
-        onScan(trolleyId);
+        
+        // Stop camera immediately
+        const inst = instanceRef.current;
+        if (inst) {
+          inst.clear()
+            .then(() => {
+              // Stop all video tracks to turn off camera
+              const container = document.getElementById('qr-scanner-container');
+              if (container) {
+                const videos = container.getElementsByTagName('video');
+                for (let video of videos) {
+                  const stream = video.srcObject;
+                  if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                  }
+                }
+                container.innerHTML = '';
+              }
+              instanceRef.current = null;
+            })
+            .catch(err => console.debug('Scanner clear error:', err));
+        }
+        
+        onScanRef.current && onScanRef.current(trolleyId);
       }
     };
 
     const handleError = (err) => {
-      if (!err.includes('NotFoundException')) {
-        console.debug('QR scan error:', err);
-      }
+      if (typeof err === 'string' && err.includes('NotFoundException')) return;
+      console.debug('QR scan error:', err);
     };
 
     scanner.render(handleScan, handleError);
 
     return () => {
-      scanner.clear().catch(() => {});
+      const inst = instanceRef.current;
+      if (inst) {
+        inst
+          .clear()
+          .catch(() => {})
+          .finally(() => {
+            instanceRef.current = null;
+            const container = document.getElementById(containerId);
+            if (container) container.innerHTML = '';
+          });
+      }
     };
-  }, [hasCamera, onScan, onError]);
+  }, [hasCamera]);
+
+  if (scanComplete) {
+    return (
+      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 text-center border border-green-200">
+        <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-4">
+          <span className="text-4xl">✅</span>
+        </div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">
+          QR Code Scanned!
+        </h3>
+        <p className="text-gray-600">
+          Connecting to your trolley...
+        </p>
+      </div>
+    );
+  }
 
   if (!hasCamera) {
     return (
@@ -120,7 +192,7 @@ export default function QRScanner({ onScan, onError }) {
         </div>
       )}
 
-      {/* Custom Styles for html5-qrcode */}
+      {/* Scoped styles for html5-qrcode */}
       <style>{`
         #qr-scanner-container {
           border: none !important;

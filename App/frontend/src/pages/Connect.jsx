@@ -43,18 +43,20 @@ export default function Connect() {
         if (response && response.session_id) {
           // Backend session created successfully, store it locally
           const session = {
-            id: response.session_id,
+            id: response.session_id,  // Use backend UUID
             trolleyId: trolleyIdUpper,
             createdAt: new Date().toISOString(),
             lastActivity: new Date().toISOString(),
           };
           localStorage.setItem('smart_trolley_session', JSON.stringify(session));
+        } else {
+          throw new Error('No session_id in response');
         }
       } catch (apiErr) {
         console.error('Backend session creation failed:', apiErr);
-        // If backend fails, create local session as fallback
-        sessionManager.createSession(trolleyIdUpper);
-        setError(`Warning: Connected offline. Backend error: ${apiErr.message}`);
+        setError(`Failed to connect: ${apiErr.message}`);
+        setLoading(false);
+        return;
       }
 
       // Show success animation

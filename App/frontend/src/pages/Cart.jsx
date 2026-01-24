@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import sessionManager from '../utils/sessionManager';
 import heartbeatManager from '../utils/heartbeatManager';
 import api from '../utils/api';
+import { getProductImage } from '../utils/productImageMap';
 
 export default function Cart() {
   const navigate = useNavigate();
@@ -58,6 +59,8 @@ export default function Cart() {
           const flattenedItems = cartData.items.map((item) => ({
             id: item.product.barcode, // Use barcode as unique ID
             ...item.product,
+            // Attach image URL via util
+            image: getProductImage(item.product),
             quantity: item.quantity,
             subtotal: item.subtotal,
           }));
@@ -96,6 +99,7 @@ export default function Cart() {
         const flattenedItems = cartData.items.map((item) => ({
           id: item.product.barcode,
           ...item.product,
+          image: getProductImage(item.product),
           quantity: item.quantity,
           subtotal: item.subtotal,
         }));
@@ -308,8 +312,12 @@ export default function Cart() {
                 >
                   <div className="flex items-center gap-4">
                     {/* Product Image */}
-                    <div className="w-14 h-14 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center text-2xl shrink-0">
-                      {product.image || '📦'}
+                    <div className="w-14 h-14 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center text-2xl shrink-0 overflow-hidden">
+                      {product.image ? (
+                        <img src={product.image} alt={name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-2xl">📦</span>
+                      )}
                     </div>
 
                     {/* Product Info */}

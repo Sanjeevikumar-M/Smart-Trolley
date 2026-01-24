@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import sessionManager from '../utils/sessionManager';
 import api from '../utils/api';
+import { getProductImage } from '../utils/productImageMap';
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export default function Checkout() {
           const flattenedItems = cartData.items.map((item) => ({
             id: item.product.barcode,
             ...item.product,
+            image: getProductImage(item.product),
             quantity: item.quantity,
             subtotal: item.subtotal,
           }));
@@ -187,8 +189,12 @@ export default function Checkout() {
               <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
                 {cartItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg shrink-0">
-                      {item.image || '📦'}
+                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-lg shrink-0 overflow-hidden">
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lg">📦</span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
