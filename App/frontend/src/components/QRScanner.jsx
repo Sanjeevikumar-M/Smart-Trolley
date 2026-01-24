@@ -9,6 +9,7 @@ export default function QRScanner({ onScan, onError }) {
   const [hasCamera, setHasCamera] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState(null);
+  const [scanComplete, setScanComplete] = useState(false);
 
   // Keep callbacks stable
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
@@ -40,7 +41,7 @@ export default function QRScanner({ onScan, onError }) {
 
   // Initialize scanner once when camera is available
   useEffect(() => {
-    if (!hasCamera || instanceRef.current) return;
+    if (!hasCamera || instanceRef.current || scanComplete) return;
 
     const containerId = 'qr-scanner-container';
     // Defensive: ensure container is clean before init
@@ -70,9 +71,32 @@ export default function QRScanner({ onScan, onError }) {
       } else if (decodedText.match(/^[A-Z0-9_]+$/i)) {
         trolleyId = decodedText.toUpperCase();
       }
-      if (trolleyId) {
+      if (trolleyId && !scanComplete) {
+        setScanComplete(true);
         setIsScanning(false);
-        instanceRef.current?.clear().catch(() => {});
+        
+        // Stop camera immediately
+        const inst = instanceRef.current;
+        if (inst) {
+          inst.clear()
+            .then(() => {
+              // Stop all video tracks to turn off camera
+              const container = document.getElementById('qr-scanner-container');
+              if (container) {
+                const videos = container.getElementsByTagName('video');
+                for (let video of videos) {
+                  const stream = video.srcObject;
+                  if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                  }
+                }
+                container.innerHTML = '';
+              }
+              instanceRef.current = null;
+            })
+            .catch(err => console.debug('Scanner clear error:', err));
+        }
+        
         onScanRef.current && onScanRef.current(trolleyId);
       }
     };
@@ -98,6 +122,22 @@ export default function QRScanner({ onScan, onError }) {
       }
     };
   }, [hasCamera]);
+
+  if (scanComplete) {
+    return (
+      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 text-center border border-green-200">
+        <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-4">
+          <span className="text-4xl">✅</span>
+        </div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">
+          QR Code Scanned!
+        </h3>
+        <p className="text-gray-600">
+          Connecting to your trolley...
+        </p>
+      </div>
+    );
+  }
 
   if (!hasCamera) {
     return (
