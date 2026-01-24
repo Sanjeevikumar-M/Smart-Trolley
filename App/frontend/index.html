@@ -3,18 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="Smart Trolley - Experience the future of shopping with QR-powered smart carts" />
+    <meta name="description" content="Smart Trolley - Experience the future of shopping with QR-powered smart carts. Skip the queues, scan & checkout instantly." />
+    <meta name="keywords" content="smart trolley, smart cart, QR shopping, contactless checkout, retail technology" />
+    <meta name="author" content="SmartTrolley" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="SmartTrolley" />
     <meta name="theme-color" content="#6366f1" />
+    <meta name="msapplication-TileColor" content="#6366f1" />
+    
+    <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <title>SmartTrolley - Shop Smarter</title>
+    
+    <!-- Inter font with more weights for better typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <title>SmartTrolley - Shop Smarter, Checkout Faster</title>
+    
+    <!-- Smooth loading experience -->
+    <style>
+      html { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); }
+      body { opacity: 0; transition: opacity 0.3s ease; }
+      body.loaded { opacity: 1; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Smooth page load transition
+      window.addEventListener('load', () => document.body.classList.add('loaded'));
+    </script>
   </body>
 </html>

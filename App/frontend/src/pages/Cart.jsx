@@ -200,21 +200,25 @@ export default function Cart() {
   const totalAmount = typeof cart?.total === 'string' ? parseFloat(cart.total) : (cart?.total || 0);
 
   return (
-    <div className="min-h-screen pt-20 pb-32">
+    <div className="min-h-screen pt-20 pb-32 relative">
+      {/* Background decoration */}
+      <div className="absolute top-20 right-0 w-80 h-80 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-full blur-3xl opacity-40"></div>
+      <div className="absolute bottom-40 left-0 w-64 h-64 bg-gradient-to-tr from-blue-500/20 to-cyan-500/20 rounded-full blur-3xl opacity-40"></div>
+
       {/* No Session Redirect */}
       {!hasSession && !loading && (
-        <div className="text-center py-16 animate-slide-in">
-          <div className="w-32 h-32 mx-auto bg-gradient-to-br from-amber-100 to-orange-200 rounded-full flex items-center justify-center mb-6">
-            <span className="text-6xl">⚠️</span>
+        <div className="text-center py-16 animate-slide-in relative z-10">
+          <div className="w-36 h-36 mx-auto bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-yellow-500/20 rounded-full flex items-center justify-center mb-8 shadow-xl border border-amber-500/30">
+            <span className="text-7xl drop-shadow-lg">⚠️</span>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">No Trolley Connected</h2>
-          <p className="text-gray-500 mb-8">Please connect to a trolley first to start shopping</p>
+          <h2 className="text-3xl font-black text-white mb-3">No Trolley Connected</h2>
+          <p className="text-lg text-slate-400 mb-10 font-medium">Please connect to a trolley first to start shopping</p>
           
           <button
             onClick={() => navigate('/connect', { replace: true })}
-            className="inline-flex items-center gap-2 btn-primary"
+            className="inline-flex items-center gap-3 btn-primary text-lg px-8"
           >
-            <span>📷</span>
+            <span className="text-2xl">📷</span>
             Connect to Trolley
           </button>
         </div>
@@ -222,80 +226,95 @@ export default function Cart() {
 
       {hasSession && (
       <>
-      <div className="glass sticky top-16 z-40 border-b border-white/20">
-        <div className="max-w-2xl mx-auto px-4 py-4">
+      {/* Sticky Header */}
+      <div className="glass sticky top-16 z-40 border-b border-cyan-500/20 shadow-lg shadow-cyan-500/10">
+        <div className="max-w-2xl mx-auto px-4 py-5">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <span>🛒</span>
-                Scanned Items
+              <h1 className="text-2xl font-black text-white flex items-center gap-3">
+                <span className="text-3xl">🛒</span>
+                <span>Scanned Items</span>
               </h1>
-              <p className="text-sm text-gray-500">
-                {itemCount} {itemCount === 1 ? 'item' : 'items'}
+              <p className="text-sm text-slate-400 font-medium mt-1">
+                {itemCount} {itemCount === 1 ? 'item' : 'items'} in your cart
               </p>
             </div>
             {trolleyId && (
-              <div className="flex items-center gap-2 bg-gradient-to-r from-indigo-100 to-purple-100 px-3 py-2 rounded-xl">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs font-medium text-indigo-700">{trolleyId}</span>
+              <div className="flex items-center gap-3 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-purple-500/10 px-4 py-3 rounded-2xl border border-cyan-500/30">
+                <div className="relative">
+                  <div className="w-3 h-3 bg-emerald-400 rounded-full animate-ping absolute"></div>
+                  <div className="w-3 h-3 bg-emerald-400 rounded-full relative"></div>
+                </div>
+                <span className="text-sm font-bold text-cyan-400">{trolleyId}</span>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="max-w-2xl mx-auto px-4 py-6 relative z-10">
         {/* Loading State */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="relative w-20 h-20 mb-4">
-              <div className="absolute inset-0 border-4 border-indigo-200 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="relative w-24 h-24 mb-6">
+              <div className="absolute inset-0 border-4 border-cyan-500/20 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-transparent border-t-cyan-400 border-r-blue-500 rounded-full animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-3xl animate-pulse">📦</span>
+              </div>
             </div>
-            <p className="text-gray-600">Loading scanned items...</p>
+            <p className="text-slate-400 font-medium">Loading scanned items...</p>
           </div>
         )}
 
         {/* Empty Cart */}
         {!loading && cartItems.length === 0 && (
           <div className="text-center py-16 animate-slide-in">
-            <div className="w-32 h-32 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-6">
-              <span className="text-6xl opacity-50">📦</span>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">No items scanned yet</h2>
-            <p className="text-gray-500 mb-8">Use the ESP32 scanner on your trolley to add products</p>
-            
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-6 mb-8 border border-indigo-100">
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <p className="text-gray-700 font-medium">Waiting for scans...</p>
+            <div className="relative inline-block mb-8">
+              <div className="w-40 h-40 mx-auto bg-gradient-to-br from-slate-800 via-slate-800/80 to-slate-900 rounded-full flex items-center justify-center shadow-xl border border-slate-700">
+                <span className="text-7xl opacity-40">📦</span>
               </div>
-              <p className="text-sm text-gray-500">
+            </div>
+            <h2 className="text-3xl font-black text-white mb-3">No items scanned yet</h2>
+            <p className="text-lg text-slate-400 mb-10 font-medium">Use the ESP32 scanner on your trolley to add products</p>
+            
+            <div className="card p-8 mb-10 max-w-sm mx-auto">
+              <div className="flex items-center justify-center gap-4 mb-4">
+                <div className="relative">
+                  <div className="w-4 h-4 bg-emerald-400 rounded-full animate-ping absolute"></div>
+                  <div className="w-4 h-4 bg-emerald-400 rounded-full relative"></div>
+                </div>
+                <p className="text-white font-bold text-lg">Waiting for scans...</p>
+              </div>
+              <p className="text-slate-400 font-medium">
                 Products will appear here automatically when scanned
               </p>
             </div>
 
             <Link
               to="/connect"
-              className="inline-flex items-center gap-2 btn-primary"
+              className="inline-flex items-center gap-3 btn-secondary"
             >
-              <span>📷</span>
-              Connect Trolley
+              <span className="text-xl">📷</span>
+              Connect New Trolley
             </Link>
           </div>
         )}
 
         {/* Cart Items */}
         {!loading && cartItems.length > 0 && (
-          <div className="space-y-6 animate-slide-in">
+          <div className="space-y-6 animate-fade-in-up">
             {/* Scanning Status */}
-            <div className="flex items-center justify-center gap-3 py-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-sm text-green-700 font-medium">Scanner active</span>
+            <div className="flex items-center justify-center gap-4 py-4 bg-gradient-to-r from-emerald-900/30 via-cyan-900/30 to-blue-900/30 rounded-2xl border border-emerald-500/30 shadow-sm">
+              <div className="relative">
+                <div className="w-3 h-3 bg-emerald-400 rounded-full animate-ping absolute"></div>
+                <div className="w-3 h-3 bg-emerald-400 rounded-full relative"></div>
+              </div>
+              <span className="text-sm text-emerald-400 font-bold">Scanner active - Add more items!</span>
             </div>
 
             {/* Items List */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               {cartItems.map((item, index) => {
                 // Handle both flattened and nested product structure
                 const product = item.product || item;
@@ -307,48 +326,48 @@ export default function Cart() {
                 return (
                 <div
                   key={itemId}
-                  className="card-product p-4 animate-slide-in"
-                  style={{ animationDelay: `${index * 0.1}s` }}
+                  className="card-product p-5 animate-fade-in-up group"
+                  style={{ animationDelay: `${index * 0.08}s` }}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-5">
                     {/* Product Image */}
-                    <div className="w-14 h-14 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl flex items-center justify-center text-2xl shrink-0 overflow-hidden">
+                    <div className="w-18 h-18 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900 rounded-2xl flex items-center justify-center text-3xl shrink-0 overflow-hidden shadow-inner border border-slate-700 group-hover:scale-105 transition-transform">
                       {product.image ? (
                         <img src={product.image} alt={name} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-2xl">📦</span>
+                        <span className="opacity-60">📦</span>
                       )}
                     </div>
 
                     {/* Product Info */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{name}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-lg font-bold text-indigo-600">
+                      <h3 className="font-bold text-lg text-white truncate">{name}</h3>
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-xl font-black text-gradient">
                           ${(price * quantity).toFixed(2)}
                         </span>
                         {quantity > 1 && (
-                          <span className="text-xs text-gray-500">
-                            (${price.toFixed(2)} × {quantity})
+                          <span className="text-xs text-slate-500 font-medium bg-slate-800 px-2 py-1 rounded-lg">
+                            ${price.toFixed(2)} × {quantity}
                           </span>
                         )}
                       </div>
                     </div>
 
                     {/* Quantity Controls */}
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 bg-slate-800 rounded-xl p-1 border border-slate-700">
                       <button
                         onClick={() => handleUpdateQuantity(itemId, quantity - 1)}
-                        className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center text-lg font-semibold transition-colors"
+                        className="icon-btn bg-slate-700 shadow-sm hover:bg-slate-600 text-white font-bold"
                       >
                         −
                       </button>
-                      <span className="w-8 text-center font-semibold text-gray-900">
+                      <span className="w-10 text-center font-bold text-lg text-white">
                         {quantity}
                       </span>
                       <button
                         onClick={() => handleUpdateQuantity(itemId, quantity + 1)}
-                        className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center text-lg font-semibold transition-colors"
+                        className="icon-btn bg-slate-700 shadow-sm hover:bg-slate-600 text-white font-bold"
                       >
                         +
                       </button>
@@ -357,7 +376,7 @@ export default function Cart() {
                     {/* Delete Button */}
                     <button
                       onClick={() => handleRemoveFromCart(itemId)}
-                      className="w-8 h-8 text-red-500 hover:bg-red-50 rounded-lg flex items-center justify-center transition-colors"
+                      className="icon-btn icon-btn-danger ml-2"
                     >
                       ✕
                     </button>
@@ -372,26 +391,27 @@ export default function Cart() {
 
       {/* Sticky Bottom Bar */}
       {!loading && cartItems.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 glass border-t border-white/30 safe-area-bottom">
-          <div className="max-w-2xl mx-auto px-4 py-4">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed bottom-0 left-0 right-0 glass border-t border-cyan-500/20 safe-area-bottom shadow-2xl shadow-cyan-500/10">
+          <div className="max-w-2xl mx-auto px-4 py-5">
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <p className="text-sm text-gray-500">Total ({itemCount} items)</p>
-                <p className="text-3xl font-bold text-gradient">${totalAmount.toFixed(2)}</p>
+                <p className="text-sm text-slate-400 font-medium">Total ({itemCount} items)</p>
+                <p className="text-4xl font-black text-gradient">${totalAmount.toFixed(2)}</p>
               </div>
               <button
                 onClick={handleClearCart}
-                className="text-red-500 hover:text-red-600 text-sm font-medium"
+                className="text-red-400 hover:text-red-300 text-sm font-bold flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-red-500/10 transition-colors"
               >
+                <span>🗑️</span>
                 Clear All
               </button>
             </div>
             <button
               onClick={() => navigate('/checkout')}
-              className="w-full btn-success py-4 rounded-2xl text-lg flex items-center justify-center gap-2"
+              className="w-full btn-success py-5 rounded-2xl text-xl flex items-center justify-center gap-3 group"
             >
               <span>Proceed to Checkout</span>
-              <span>→</span>
+              <span className="text-2xl group-hover:translate-x-2 transition-transform">→</span>
             </button>
           </div>
         </div>
