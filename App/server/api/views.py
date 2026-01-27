@@ -119,10 +119,28 @@ class SessionEndView(APIView):
 
 class CartScanView(APIView):
 	def post(self, request):
-		# Support both session_id (frontend) and trolley_id (ESP32)
+		from PIL import Image
+		from pyzbar.pyzbar import decode
+
+		# Accept image via multipart/form-data as 'barcode_image'
+		barcode_image = request.FILES.get('barcode_image')
 		has_session_id = 'session_id' in request.data
 		has_trolley_id = 'trolley_id' in request.data
-		
+
+		if not barcode_image:
+			return Response({'detail': 'barcode_image file is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+		# Decode barcode from image
+		try:
+			img = Image.open(barcode_image)
+			decoded_objs = decode(img)
+			if not decoded_objs:
+				return Response({'detail': 'No barcode found in image'}, status=status.HTTP_400_BAD_REQUEST)
+			barcode = decoded_objs[0].data.decode('utf-8')
+		except Exception as e:
+			return Response({'detail': f'Error decoding barcode: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+		# Validate session/trolley
 		if has_session_id:
 			serializer = CartScanSerializer(data=request.data)
 		elif has_trolley_id:
@@ -132,9 +150,8 @@ class CartScanView(APIView):
 				{'detail': 'Either session_id or trolley_id is required'},
 				status=status.HTTP_400_BAD_REQUEST
 			)
-		
+
 		serializer.is_valid(raise_exception=True)
-		barcode = serializer.validated_data['barcode']
 
 		with transaction.atomic():
 			if has_session_id:
