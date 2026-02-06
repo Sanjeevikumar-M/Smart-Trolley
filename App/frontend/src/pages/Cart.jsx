@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import sessionManager from '../utils/sessionManager';
 import heartbeatManager from '../utils/heartbeatManager';
 import api from '../utils/api';
 import { getProductImage } from '../utils/productImageMap';
+import BarcodeScanner from '../components/BarcodeScanner';
 
 export default function Cart() {
   const navigate = useNavigate();
@@ -11,6 +12,9 @@ export default function Cart() {
   const [loading, setLoading] = useState(true);
   const [pollingActive, setPollingActive] = useState(true);
   const [hasSession, setHasSession] = useState(false);
+  const [scanBusy, setScanBusy] = useState(false);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
 
   useEffect(() => {
     // Check if user has a valid session
@@ -41,6 +45,24 @@ export default function Cart() {
       // Don't stop heartbeat here - let it run as long as user is in the app
     };
   }, [pollingActive]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showToast = (message, tone = 'info') => {
+    setToast({ message, tone });
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2600);
+  };
 
   const fetchCart = async () => {
     try {
@@ -211,6 +233,36 @@ export default function Cart() {
     }
   };
 
+  const handleBarcodeScan = async (barcode) => {
+    const sessionId = sessionManager.getSessionId();
+    if (!sessionId) {
+      setHasSession(false);
+      heartbeatManager.stop();
+      showToast('No active session found', 'error');
+      return;
+    }
+
+    if (!barcode) {
+      showToast('Invalid barcode detected', 'error');
+      return;
+    }
+
+    try {
+      setScanBusy(true);
+      await api.scanProduct(sessionId, barcode);
+      await fetchCart();
+      showToast('Product added to cart', 'success');
+    } catch (err) {
+      if (err?.status === 404) {
+        showToast('No product found for this barcode', 'error');
+      } else {
+        showToast(err?.message || 'Scan failed', 'error');
+      }
+    } finally {
+      setScanBusy(false);
+    }
+  };
+
   const cartItems = cart?.items || [];
   const itemCount = cartItems.reduce((sum, item) => sum + (item?.quantity || 1), 0);
   const trolleyId = sessionManager.getTrolleyId();
@@ -221,6 +273,22 @@ export default function Cart() {
       {/* Background decoration */}
       <div className="absolute top-20 right-0 w-80 h-80 bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rounded-full blur-3xl opacity-40"></div>
       <div className="absolute bottom-40 left-0 w-64 h-64 bg-gradient-to-tr from-blue-500/20 to-cyan-500/20 rounded-full blur-3xl opacity-40"></div>
+
+      {toast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50">
+          <div
+            className={`rounded-full px-5 py-3 text-sm font-semibold shadow-lg border ${
+              toast.tone === 'success'
+                ? 'bg-emerald-500/20 text-emerald-200 border-emerald-500/40'
+                : toast.tone === 'error'
+                ? 'bg-rose-500/20 text-rose-200 border-rose-500/40'
+                : 'bg-cyan-500/20 text-cyan-200 border-cyan-500/40'
+            }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
 
       {/* No Session Redirect */}
       {!hasSession && !loading && (
@@ -270,6 +338,27 @@ export default function Cart() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 relative z-10">
+        {/* Scan Product */}
+        <div className="card p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-black text-white">Scan Product</h2>
+              <p className="text-sm text-slate-400 font-medium">
+                Point the camera at the barcode to add items
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-cyan-200 bg-cyan-500/10 border border-cyan-500/30 px-3 py-2 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+              {scanBusy ? 'Adding item...' : 'Ready'}
+            </div>
+          </div>
+          <BarcodeScanner
+            onScan={handleBarcodeScan}
+            onError={() => showToast('Camera error. Check permissions.', 'error')}
+            disabled={scanBusy || loading}
+          />
+        </div>
+
         {/* Loading State */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-20">
@@ -293,7 +382,7 @@ export default function Cart() {
               </div>
             </div>
             <h2 className="text-3xl font-black text-white mb-3">No items scanned yet</h2>
-            <p className="text-lg text-slate-400 mb-10 font-medium">Use the ESP32 scanner on your trolley to add products</p>
+            <p className="text-lg text-slate-400 mb-10 font-medium">Use the barcode scanner above to add products</p>
             
             <div className="card p-8 mb-10 max-w-sm mx-auto">
               <div className="flex items-center justify-center gap-4 mb-4">

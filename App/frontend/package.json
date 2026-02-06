@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "@zxing/library": "^0.21.0",
     "html5-qrcode": "^2.3.8",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-zxing": "^2.0.1",
     "react-router-dom": "^6.26.0",
     "tailwindcss": "^4.1.18"
   },

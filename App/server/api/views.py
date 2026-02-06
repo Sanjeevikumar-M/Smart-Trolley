@@ -27,6 +27,7 @@ class UserSignupView(APIView):
 	def post(self, request):
 		serializer = UserSignupSerializer(data=request.data)
 		serializer.is_valid(raise_exception=True)
+		barcode = serializer.validated_data['barcode']
 		user = serializer.save()
 		return Response({'user_id': user.user_id}, status=status.HTTP_201_CREATED)
 
@@ -122,29 +123,32 @@ class CartScanView(APIView):
 		from PIL import Image
 		from pyzbar.pyzbar import decode
 
-		# Accept image via multipart/form-data as 'barcode_image'
+		data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
 		barcode_image = request.FILES.get('barcode_image')
-		has_session_id = 'session_id' in request.data
-		has_trolley_id = 'trolley_id' in request.data
+		barcode = data.get('barcode')
+		has_session_id = 'session_id' in data
+		has_trolley_id = 'trolley_id' in data
 
-		if not barcode_image:
-			return Response({'detail': 'barcode_image file is required'}, status=status.HTTP_400_BAD_REQUEST)
+		if not barcode:
+			if not barcode_image:
+				return Response({'detail': 'barcode or barcode_image is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-		# Decode barcode from image
-		try:
-			img = Image.open(barcode_image)
-			decoded_objs = decode(img)
-			if not decoded_objs:
-				return Response({'detail': 'No barcode found in image'}, status=status.HTTP_400_BAD_REQUEST)
-			barcode = decoded_objs[0].data.decode('utf-8')
-		except Exception as e:
-			return Response({'detail': f'Error decoding barcode: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+			try:
+				img = Image.open(barcode_image)
+				decoded_objs = decode(img)
+				if not decoded_objs:
+					return Response({'detail': 'No barcode found in image'}, status=status.HTTP_400_BAD_REQUEST)
+				barcode = decoded_objs[0].data.decode('utf-8')
+			except Exception as e:
+				return Response({'detail': f'Error decoding barcode: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+			data['barcode'] = barcode
 
 		# Validate session/trolley
 		if has_session_id:
-			serializer = CartScanSerializer(data=request.data)
+			serializer = CartScanSerializer(data=data)
 		elif has_trolley_id:
-			serializer = CartScanTrolleySerializer(data=request.data)
+			serializer = CartScanTrolleySerializer(data=data)
 		else:
 			return Response(
 				{'detail': 'Either session_id or trolley_id is required'},
